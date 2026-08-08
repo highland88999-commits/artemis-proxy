@@ -1,0 +1,69 @@
+name: Artemis Proxy Cloud Runner
+
+# 1. THE TRIGGERS
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Developer task (install, build, test, deploy)'
+        required: true
+        default: 'deploy'
+
+jobs:
+  proxy_execution_pipeline:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Pull the Artemis Proxy code
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Setup Node environment
+      - name: ⚙️ Setup Node.js (v18)
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          # NOTE: If you run 'npm install' locally and push your package-lock.json, 
+          # you can uncomment the line below to speed up cloud execution.
+          # cache: 'npm' 
+
+      # Step 3: Install cors-anywhere and dependencies
+      - name: 📦 Install Proxy Dependencies
+        run: npm install
+
+      # Step 4: Safely attempt a build (Skips if no build script exists)
+      - name: 🛠️ Execute Build
+        if: ${{ github.event.inputs.task == 'build' || github.event.inputs.task == 'deploy' || github.event_name == 'push' }}
+        run: npm run build --if-present
+
+      # Step 5: Verify the Neural Lock (Server Boot Test)
+      # Boots the proxy on port 8080 and verifies it accepts connections
+      - name: 🛡️ Verify Neural Lock Integrity
+        if: ${{ github.event.inputs.task == 'test' || github.event.inputs.task == 'deploy' || github.event_name == 'push' }}
+        run: |
+          echo "Booting Artemis Proxy locally..."
+          nohup npm start & 
+          sleep 3
+          # cors-anywhere serves a help page on the root '/' route. We curl it to verify 200 OK.
+          curl -f http://localhost:8080/ || exit 1
+          echo "Proxy integrity verified. Neural Lock is Active."
+
+      # Step 6: Production Deployment
+      - name: 🚀 Execute Cloud Deployment
+        if: ${{ github.event.inputs.task == 'deploy' || github.event_name == 'push' }}
+        run: |
+          echo "Initiating deployment sequence to Node.js Host..."
+          
+          # --- RENDER DEPLOYMENT (Recommended for this Proxy) ---
+          # Create a Web Service on Render, grab the Deploy Hook URL, and save it to GitHub Secrets
+          # curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          
+          # --- RAILWAY DEPLOYMENT ---
+          # npm i -g @railway/cli
+          # railway up --detach --token ${{ secrets.RAILWAY_TOKEN }}
+          
+          # --- HEROKU DEPLOYMENT ---
+          # git remote add heroku https://heroku:${{ secrets.HEROKU_API_KEY }}@git.heroku.com/artemis-proxy.git
+          # git push heroku main
