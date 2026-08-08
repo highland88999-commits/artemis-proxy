@@ -36,8 +36,6 @@ cors_proxy.createServer({
     // 3. DEEP HEADER STRIPPING (Unlocks Iframes)
     requireHeader: [], 
     removeHeaders: [
-        'cookie', 
-        'cookie2', 
         'x-frame-options', 
         'content-security-policy',
         'content-security-policy-report-only',
